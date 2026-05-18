@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold">訂單管理</h3>
+    <a class="btn btn-success" href="{{ url_for('order_new') }}">新增訂單</a>
+</div>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+            <tr>
+                <th>訂單編號</th>
+                <th>客戶</th>
+                <th>電話</th>
+                <th>下單日期</th>
+                <th>狀態</th>
+                <th>數量</th>
+                <th>金額</th>
+                <th>出貨日期</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for o in orders %}
+            <tr>
+                <td>#{{ o.oID }}</td>
+                <td>{{ o.name }}</td>
+                <td>{{ o.phone_number|mask_phone }}</td>
+                <td>{{ o.order_time }}</td>
+                <td><span class="badge text-bg-success">{{ o.state }}</span></td>
+                <td>{{ o.total_amount }}</td>
+                <td>NT${{ o.price }}</td>
+                <td>{{ o.ship_time }}</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('order_detail', oID=o.oID) }}">查看</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-center text-muted">沒有資料</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

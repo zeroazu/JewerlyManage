@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold">商品管理</h3>
+    <a class="btn btn-success" href="{{ url_for('product_new') }}">新增商品</a>
+</div>
+
+<form class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input class="form-control" name="q" value="{{ q }}" placeholder="搜尋商品編號、名稱或尺寸">
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-success">搜尋</button>
+    </div>
+</form>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+            <tr>
+                <th>商品編號</th>
+                <th>尺寸</th>
+                <th>商品名稱</th>
+                <th>成本</th>
+                <th>建議售價</th>
+                <th>實際售價</th>
+                <th>利潤</th>
+                <th>庫存</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for p in products %}
+            <tr>
+                <td>{{ p.iID }}</td>
+                <td>{{ p.size }}</td>
+                <td>{{ p.i_name }}</td>
+                <td>NT${{ p.cost }}</td>
+                <td>NT${{ p.suggested_price }}</td>
+                <td>NT${{ p.real_price }}</td>
+                <td>NT${{ p.profits_calc }}</td>
+                <td>
+                    {% if p.available|int <= 1 %}
+                        <span class="badge text-bg-danger">{{ p.available }}</span>
+                    {% else %}
+                        {{ p.available }}
+                    {% endif %}
+                </td>
+                <td>
+                    <a class="btn btn-sm btn-outline-success" href="{{ url_for('recipes') }}?product_key={{ p.iID }}">BOM</a>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('product_edit', iID=p.iID) }}">編輯</a>
+                    <form class="action-form" method="post" action="{{ url_for('product_delete', iID=p.iID) }}" onsubmit="return confirm('確定刪除？')">
+                        <button class="btn btn-sm btn-outline-danger">刪除</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" class="text-center text-muted">沒有資料</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

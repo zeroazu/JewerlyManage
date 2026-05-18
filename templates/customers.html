@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold">客戶管理</h3>
+    <a class="btn btn-success" href="{{ url_for('customer_new') }}">新增客戶</a>
+</div>
+
+<form class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input class="form-control" name="q" value="{{ q }}" placeholder="搜尋電話、姓名、平台、地區">
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-success">搜尋</button>
+    </div>
+</form>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+            <tr>
+                <th>電話</th>
+                <th>姓名</th>
+                <th>性別</th>
+                <th>年齡</th>
+                <th>平台</th>
+                <th>地區</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for c in customers %}
+            <tr>
+                <td>{{ c.phone_number|mask_phone }}</td>
+                <td>{{ c.name }}</td>
+                <td>{{ c.gender }}</td>
+                <td>{{ c.age }}</td>
+                <td>{{ c.platform }}</td>
+                <td>{{ c.area }}</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('customer_edit', phone_number=c.phone_number) }}">編輯</a>
+                    <form class="action-form" method="post" action="{{ url_for('customer_delete', phone_number=c.phone_number) }}" onsubmit="return confirm('確定刪除？')">
+                        <button class="btn btn-sm btn-outline-danger">刪除</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted">沒有資料</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
