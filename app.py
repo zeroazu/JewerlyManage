@@ -83,6 +83,10 @@ def init_db():
     """Create tables matching jewerly.db schema if the db file is empty."""
     db = get_db()
 
+    # 清掉舊版程式誤建立的 legacy orders 表。
+    # 這張表會引用不存在的 customer.phone_num，會造成刪除 CUSTOMER 時 foreign key mismatch。
+    db.execute("DROP TABLE IF EXISTS orders")
+
     db.executescript('''
     CREATE TABLE IF NOT EXISTS CUSTOMER (
         phone_number TEXT (10) PRIMARY KEY UNIQUE
@@ -324,6 +328,9 @@ def customer_delete(phone_number):
         flash("客戶刪除成功", "success")
     except sqlite3.IntegrityError:
         flash("此客戶已有訂單，不能刪除", "danger")
+    except sqlite3.OperationalError as e:
+        db.rollback()
+        flash(f"刪除失敗：資料表關聯設定有問題，請重新啟動程式讓系統自動修正。{e}", "danger")
     return redirect(url_for("customers"))
 
 
