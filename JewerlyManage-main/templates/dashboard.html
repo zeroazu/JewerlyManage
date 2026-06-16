@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-4">Dashboard</h3>
+<div class="row g-3 mb-4">
+    <div class="col-md-3"><div class="card p-3"><div class="text-muted">訂單數</div><div class="fs-2 fw-bold">{{ order_count }}</div></div></div>
+    <div class="col-md-3"><div class="card p-3"><div class="text-muted">客戶數</div><div class="fs-2 fw-bold">{{ customer_count }}</div></div></div>
+    <div class="col-md-3"><div class="card p-3"><div class="text-muted">商品品項</div><div class="fs-2 fw-bold">{{ product_count }}</div></div></div>
+    <div class="col-md-3"><div class="card p-3"><div class="text-muted">物料種類</div><div class="fs-2 fw-bold">{{ material_count }}</div></div></div>
+</div>
+<div class="row g-4">
+    <div class="col-lg-6"><div class="card p-3"><h5 class="fw-bold">最近訂單</h5><table class="table table-hover"><thead><tr><th>訂單</th><th>客戶</th><th>日期</th><th>狀態</th><th>金額</th></tr></thead><tbody>{% for o in recent_orders %}<tr><td><a href="{{ url_for('order_detail', oID=o.oID) }}">#{{ o.oID }}</a></td><td>{{ o.name }}</td><td>{{ o.order_time }}</td><td>{{ o.state }}</td><td>NT${{ o.price }}</td></tr>{% else %}<tr><td colspan="5" class="text-center text-muted">目前沒有訂單</td></tr>{% endfor %}</tbody></table></div></div>
+    <div class="col-lg-6"><div class="card p-3"><h5 class="fw-bold">低庫存商品</h5><table class="table table-hover"><thead><tr><th>商品</th><th>尺寸</th><th>庫存</th></tr></thead><tbody>{% for p in low_products %}<tr><td>{{ p.i_name }}</td><td>{{ p.size }}</td><td><span class="badge text-bg-danger">{{ p.available }}</span></td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted">商品庫存正常</td></tr>{% endfor %}</tbody></table><h5 class="fw-bold mt-4">低庫存物料</h5><table class="table table-hover"><thead><tr><th>物料</th><th>庫存</th><th>安全庫存</th></tr></thead><tbody>{% for m in low_materials %}<tr><td>{{ m.m_name }}</td><td><span class="badge text-bg-danger">{{ m.stock }}</span></td><td>{{ m.safe_stock }}</td></tr>{% else %}<tr><td colspan="3" class="text-center text-muted">物料庫存正常</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

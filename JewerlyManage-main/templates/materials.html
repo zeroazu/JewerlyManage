@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold">物料庫存</h3>
+    <a class="btn btn-success" href="{{ url_for('material_new') }}">新增物料</a>
+</div>
+
+<form class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input class="form-control" name="q" value="{{ q }}" placeholder="搜尋物料、店家、備註">
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-outline-success">搜尋</button>
+    </div>
+</form>
+
+<div class="card p-3">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+            <tr>
+                <th>mID</th>
+                <th>物料名稱</th>
+                <th>尺寸(mm)</th>
+                <th>店家</th>
+                <th>購買日期</th>
+                <th>批發價</th>
+                <th>單價</th>
+                <th>庫存</th>
+                <th>安全庫存</th>
+                <th>備註</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for m in materials %}
+            <tr>
+                <td>{{ m.mID }}</td>
+                <td>{{ m.m_name }}</td>
+                <td>{{ m.m_size }}</td>
+                <td>{{ m.store }}</td>
+                <td>{{ m.purchase_date }}</td>
+                <td>NT${{ m.wholesale_price }}</td>
+                <td>NT${{ m.unit_price }}</td>
+                <td>
+                    {% if m.stock|int <= m.safe_stock|int %}
+                        <span class="badge text-bg-danger">{{ m.stock }}</span>
+                    {% else %}
+                        {{ m.stock }}
+                    {% endif %}
+                </td>
+                <td>{{ m.safe_stock }}</td>
+                <td>{{ m.note }}</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('material_edit', mID=m.mID) }}">編輯</a>
+                    <form class="action-form" method="post" action="{{ url_for('material_delete', mID=m.mID) }}" onsubmit="return confirm('確定刪除？')">
+                        <button class="btn btn-sm btn-outline-danger">刪除</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="11" class="text-center text-muted">沒有資料</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

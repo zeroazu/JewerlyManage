@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="fw-bold mb-3">{{ "編輯商品" if product else "新增商品" }}</h3>
+
+<div class="card p-4">
+    <form method="post">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">商品編號 iID</label>
+                <input class="form-control" name="iID" value="{{ product.iID if product else '' }}" required {% if product %}readonly{% endif %}>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">尺寸</label>
+                {% set s = product.size if product else "" %}
+                <select class="form-select" name="size" required>
+                    <option value="大" {% if s == "大" %}selected{% endif %}>大</option>
+                    <option value="中" {% if s == "中" %}selected{% endif %}>中</option>
+                    <option value="小" {% if s == "小" %}selected{% endif %}>小</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">商品名稱</label>
+                <input class="form-control" name="i_name" value="{{ product.i_name if product else '' }}" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">成本</label>
+                <input class="form-control" type="number" name="cost" value="{{ product.cost if product else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">建議售價</label>
+                <input class="form-control" type="number" name="suggested_price" value="{{ product.suggested_price if product else 0 }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">實際售價</label>
+                <input class="form-control" type="number" name="real_price" value="{{ product.real_price if product else 0 }}" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">庫存</label>
+                <input class="form-control" type="number" name="available" value="{{ product.available if product else 0 }}">
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button class="btn btn-success">儲存</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('products') }}">返回</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

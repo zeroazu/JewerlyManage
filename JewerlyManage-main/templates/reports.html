@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="fw-bold mb-3">財報</h3>
+
+<div class="card p-4 mb-4">
+    <form class="row g-3 align-items-end" method="get">
+        <div class="col-md-3">
+            <label class="form-label">開始日期</label>
+            <input class="form-control" type="date" name="start_date" value="{{ start_date }}" required>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">結束日期</label>
+            <input class="form-control" type="date" name="end_date" value="{{ end_date }}" required>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-success w-100">查詢</button>
+        </div>
+    </form>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="text-muted">訂單數</div>
+            <div class="fs-2 fw-bold">{{ summary.order_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="text-muted">銷售件數</div>
+            <div class="fs-2 fw-bold">{{ summary.item_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="text-muted">營收</div>
+            <div class="fs-2 fw-bold">NT${{ summary.revenue }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <div class="text-muted">毛利</div>
+            <div class="fs-2 fw-bold">NT${{ summary.gross_profit }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mb-4">
+    <h5 class="fw-bold mb-3">營收與毛利</h5>
+    <div style="position: relative; height: 350px; width: 100%;">
+        <canvas id="financialChart"></canvas>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card p-3">
+            <h5 class="fw-bold">商品銷售排行</h5>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>商品</th>
+                        <th>尺寸</th>
+                        <th>數量</th>
+                        <th>營收</th>
+                        <th>成本</th>
+                        <th>毛利</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in product_sales %}
+                    <tr>
+                        <td>{{ row.i_name }}</td>
+                        <td>{{ row.size }}</td>
+                        <td>{{ row.quantity }}</td>
+                        <td>NT${{ row.revenue }}</td>
+                        <td>NT${{ row.cost }}</td>
+                        <td>NT${{ row.gross_profit }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">此區間沒有銷售資料</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card p-3">
+            <h5 class="fw-bold">每日銷售</h5>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>訂單</th>
+                        <th>件數</th>
+                        <th>營收</th>
+                        <th>毛利</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in daily_sales %}
+                    <tr>
+                        <td>{{ row.order_time }}</td>
+                        <td>{{ row.order_count }}</td>
+                        <td>{{ row.item_count }}</td>
+                        <td>NT${{ row.revenue }}</td>
+                        <td>NT${{ row.gross_profit }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">此區間沒有每日資料</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mt-4">
+    <h5 class="fw-bold">區間訂單明細</h5>
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>訂單</th>
+                <th>日期</th>
+                <th>客戶</th>
+                <th>狀態</th>
+                <th>數量</th>
+                <th>金額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in order_rows %}
+            <tr>
+                <td><a href="{{ url_for('order_detail', oID=o.oID) }}">#{{ o.oID }}</a></td>
+                <td>{{ o.order_time }}</td>
+                <td>{{ o.name }}</td>
+                <td>{{ o.state }}</td>
+                <td>{{ o.total_amount }}</td>
+                <td>NT${{ o.price }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted">此區間沒有訂單</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('financialChart').getContext('2d');
+        
+        // 安全接收後端傳來的半月節點數據
+        const labels = {{ chart_labels | tojson if chart_labels else [] }};
+        const revenueData = {{ chart_revenue | tojson if chart_revenue else [] }};
+        const grossProfitData = {{ chart_gross_profit | tojson if chart_gross_profit else [] }};
+
+        if (labels.length === 0) {
+            // 若無數據，在 Canvas 區塊顯示提示文字
+            ctx.font = "16px sans-serif";
+            ctx.fillStyle = "#6c757d";
+            ctx.textAlign = "center";
+            ctx.fillText("當前篩選區間內無銷售數據", ctx.canvas.width / 2, ctx.canvas.height / 2);
+            return;
+        }
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '營業收入',
+                        data: revenueData,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.2,
+                        fill: true
+                    },
+                    {
+                        label: '營業毛利',
+                        data: grossProfitData,
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        backgroundColor: 'rgba(40, 167, 69, 0.05)',
+                        borderWidth: 2.5,
+                        tension: 0.2,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) { return 'NT$' + value; }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) {
+                                    label += 'NT$' + context.parsed.y.toLocaleString();
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
