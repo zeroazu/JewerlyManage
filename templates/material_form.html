@@ -8,7 +8,11 @@
         <div class="row g-3">
             <div class="col-md-2">
                 <label class="form-label">mID</label>
-                <input class="form-control" name="mID" value="{{ material.mID if material else '' }}" required {% if material %}readonly{% endif %}>
+                <input class="form-control" 
+                       name="mID" 
+                       value="{{ material.mID if material else '' }}" 
+                       {% if not material %} placeholder="系統自動生成" {% endif %} 
+                       readonly>
             </div>
             <div class="col-md-4">
                 <label class="form-label">物料名稱</label>

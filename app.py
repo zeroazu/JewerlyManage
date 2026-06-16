@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, g
 import sqlite3
 from pathlib import Path
 from datetime import date
-
+# 設定專案基本路徑與 SQLite 資料庫檔案路徑
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "jewerly.db"
 
@@ -11,13 +11,23 @@ app.secret_key = "dev-secret-key"
 
 
 # -----------------------------
-# Database helpers
+# Database helpers(資料庫輔助函式)
 # -----------------------------
 def get_db():
+    """
+    建立並取得資料庫連線，並設定連線參數（如 timeout、外鍵、WAL 模式等）。
+    """
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
+        # 設定 timeout=10.0，避免手動開啟資料庫軟體（如 DB Browser）時與網頁衝突鎖死
+        g.db = sqlite3.connect(DB_PATH, timeout=10.0)
         g.db.row_factory = sqlite3.Row
+        
+        # 啟用外鍵檢查
         g.db.execute("PRAGMA foreign_keys = ON")
+        
+        # 【關鍵】開啟 WAL 模式，允許外部資料庫工具與 Flask 同時讀寫，資料才能即時同步
+        g.db.execute("PRAGMA journal_mode = WAL")
+        g.db.execute("PRAGMA synchronous = NORMAL")
     return g.db
 
 
@@ -63,6 +73,9 @@ def normalize_date(value):
 
 
 def next_order_id(db):
+    """
+    查詢目前資料庫中最大的編號 ，並計算回傳下一個編號。
+    """
     row = db.execute('''
         SELECT MAX(CAST(oID AS INTEGER)) AS max_id
         FROM "ORDER"
@@ -83,8 +96,7 @@ def init_db():
     """Create tables matching jewerly.db schema if the db file is empty."""
     db = get_db()
 
-    # 清掉舊版程式誤建立的 legacy orders 表。
-    # 這張表會引用不存在的 customer.phone_num，會造成刪除 CUSTOMER 時 foreign key mismatch。
+
     db.execute("DROP TABLE IF EXISTS orders")
 
     db.executescript('''
@@ -102,11 +114,11 @@ def init_db():
         iID TEXT PRIMARY KEY UNIQUE,
         size TEXT,
         i_name TEXT,
-        cost TEXT,
-        suggested_price TEXT,
-        real_price TEXT,
-        profits TEXT,
-        available TEXT
+        cost NUMERIC,
+        suggested_price NUMERIC,
+        real_price NUMERIC,
+        profits NUMERIC,
+        available INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS MATERIAL_INVENTORY (
@@ -147,53 +159,7 @@ def init_db():
         quantity INTEGER
     );
     ''')
-
-    if db.execute("SELECT COUNT(*) AS c FROM CUSTOMER").fetchone()["c"] == 0:
-        db.executemany('''
-            INSERT INTO CUSTOMER(phone_number, name, gender, age, platform, area)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', [
-            ("0908123618", "傅*瑋", "女", 29, "Plurk", "高雄"),
-            ("0937123125", "許*慧", "女", 22, "IG", "台南"),
-        ])
-
-    if db.execute("SELECT COUNT(*) AS c FROM PRODUCT WHERE TRIM(COALESCE(iID, '')) != ''").fetchone()["c"] == 0:
-        db.execute("DELETE FROM PRODUCT WHERE TRIM(COALESCE(iID, '')) = ''")
-        products = [
-            ("1", "大", "旭日", "250", "450", "450", "200", "5"),
-            ("2", "中", "旭日", "220", "450", "450", "230", "5"),
-            ("3", "小", "旭日", "200", "450", "450", "250", "5"),
-            ("4", "大", "莓果雪酪", "260", "450", "450", "190", "5"),
-            ("5", "中", "莓果雪酪", "230", "450", "450", "220", "5"),
-            ("6", "小", "莓果雪酪", "210", "450", "450", "240", "5"),
-        ]
-        db.executemany('''
-            INSERT INTO PRODUCT(iID, size, i_name, cost, suggested_price, real_price, profits, available)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', products)
-
-    if db.execute("SELECT COUNT(*) AS c FROM MATERIAL_INVENTORY WHERE TRIM(COALESCE(mID, '')) != ''").fetchone()["c"] == 0:
-        db.execute("DELETE FROM MATERIAL_INVENTORY WHERE TRIM(COALESCE(mID, '')) = ''")
-        materials = [
-            ("1", "黃膠花", "8", "94", "阿源小舖", "2025-10-20", "3.76", "25", "5", ""),
-            ("2", "黃水晶", "5", "104", "e.NA", "2025-03-03", "1.04", "100", "10", ""),
-            ("3", "白水晶", "7", "80", "阿源小舖", "2025-07-17", "1.57", "51", "10", ""),
-            ("4", "酒黃黃水晶", "7", "64", "阿源小舖", "2025-09-26", "2.56", "25", "5", ""),
-            ("5", "星光粉晶", "7", "52", "阿源小舖", "2025-08-01", "2.00", "26", "5", ""),
-        ]
-        db.executemany('''
-            INSERT INTO MATERIAL_INVENTORY
-            (mID, m_name, m_size, wholesale_price, store, purchase_date, unit_price, stock, safe_stock, note)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', materials)
-
     db.commit()
-
-
-@app.before_request
-def setup_database():
-    init_db()
-
 
 # -----------------------------
 # Dashboard
@@ -460,16 +426,20 @@ def materials():
 
 
 @app.route("/materials/new", methods=["GET", "POST"])
+@app.route("/materials/new", methods=["GET", "POST"])
 def material_new():
     if request.method == "POST":
         db = get_db()
         try:
+            # 💡 核心修改：自動取得下一個可用的 mID 數字字串
+            mID = next_material_id(db)
+            
             db.execute('''
                 INSERT INTO MATERIAL_INVENTORY
                 (mID, m_name, m_size, wholesale_price, store, purchase_date, unit_price, stock, safe_stock, note)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                request.form.get("mID", "").strip(),
+                mID,  # 💡 使用自動生成的 ID
                 request.form["m_name"].strip(),
                 request.form.get("m_size"),
                 str(to_money(request.form.get("wholesale_price"))),
@@ -481,13 +451,12 @@ def material_new():
                 request.form.get("note"),
             ))
             db.commit()
-            flash("物料新增成功", "success")
+            flash(f"物料新增成功，編號為: {mID}", "success")
             return redirect(url_for("materials"))
         except sqlite3.IntegrityError:
-            flash("物料編號已存在", "danger")
+            flash("物料編號衝突，請重試", "danger")
 
     return render_template("material_form.html", material=None)
-
 
 @app.route("/materials/<mID>/edit", methods=["GET", "POST"])
 def material_edit(mID):
@@ -685,10 +654,14 @@ def order_new():
         order_items = []
         total_amount = 0
         total_price = 0
+        
+        # 用來累計整張訂單總共需要消耗的材料總量，避免同材料在不同商品中重複計算時沒發現超支
+        required_materials = {}
+
+        # 1. 檢查商品庫存與計算材料消耗
         for iID, qty in cart.items():
             product = db.execute('''
                 SELECT *,
-                       CAST(COALESCE(NULLIF(real_price, ''), '0') AS INTEGER) AS price_num,
                        CAST(COALESCE(NULLIF(available, ''), '0') AS INTEGER) AS stock_num
                 FROM PRODUCT
                 WHERE iID = ?
@@ -698,22 +671,58 @@ def order_new():
                 flash("找不到商品", "danger")
                 return redirect(url_for("order_new"))
 
+            # 檢查商品本身庫存
             if product["stock_num"] < qty:
                 flash(f"{product['i_name']} / {product['size']} 庫存不足，目前只剩 {product['stock_num']} 件", "danger")
                 return redirect(url_for("order_new"))
 
+            # 查詢該商品在 RECIPE 中定義的 BOM 材料
+            recipes = db.execute('''
+                SELECT r.mID, r.m_amount, m.m_name, 
+                       CAST(COALESCE(NULLIF(m.stock, ''), '0') AS INTEGER) AS current_stock
+                FROM RECIPE r
+                JOIN MATERIAL_INVENTORY m ON r.mID = m.mID
+                WHERE r.iID = ?
+            ''', (iID,)).fetchall()
+
+            # 預估並檢查材料庫存是否足夠
+            for recipe in recipes:
+                mID = recipe["mID"]
+                m_name = recipe["m_name"]
+                # 這裡乘上購買的商品數量（注意：你的 m_amount 在資料庫是 TEXT，需轉型）
+                needed_qty = to_int(recipe["m_amount"]) * qty
+                
+                if mID not in required_materials:
+                    required_materials[mID] = {
+                        "name": m_name,
+                        "needed": 0,
+                        "current_stock": recipe["current_stock"]
+                    }
+                required_materials[mID]["needed"] += needed_qty
+
+                # 立即檢查單一商品引起的材料不足
+                if required_materials[mID]["needed"] > required_materials[mID]["current_stock"]:
+                    flash(f"材料庫存不足：商品「{product['i_name']}」需要材料「{m_name}」共 {needed_qty} 單位，但目前庫存僅剩 {recipe['current_stock']}", "danger")
+                    return redirect(url_for("order_new"))
+
+            # 計算訂單總額
+            price_row = db.execute("SELECT CAST(COALESCE(NULLIF(real_price, ''), '0') AS INTEGER) AS p FROM PRODUCT WHERE iID = ?", (iID,)).fetchone()
             total_amount += qty
-            total_price += product["price_num"] * qty
+            total_price += price_row["p"] * qty
             order_items.append((iID, product["size"], qty))
 
+        # 2. 執行資料庫寫入與扣量（利用 Transaction 確保原子性）
         try:
             db.execute("BEGIN")
             oID = next_order_id(db)
+            
+            # 寫入訂單主檔
             db.execute('''
                 INSERT INTO "ORDER"(oID, phone_number, order_time, state, total_amount, price, ship_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (oID, phone_number, order_time, state, str(total_amount), str(total_price), ship_time))
 
+            # 寫入訂單明細並扣除商品庫存
             for iID, size, qty in order_items:
                 db.execute('''
                     INSERT INTO ORDER_DETAIL(oID, iID, size, quantity)
@@ -726,8 +735,16 @@ def order_new():
                     WHERE iID = ?
                 ''', (qty, iID))
 
+            # 💡 核心新增：扣除材料庫存
+            for mID, mat_info in required_materials.items():
+                db.execute('''
+                    UPDATE MATERIAL_INVENTORY
+                    SET stock = CAST(COALESCE(NULLIF(stock, ''), '0') AS INTEGER) - ?
+                    WHERE mID = ?
+                ''', (mat_info["needed"], mID))
+
             db.commit()
-            flash("訂單建立成功，購物車商品庫存已扣除", "success")
+            flash("訂單建立成功，商品與 BOM 材料庫存已同步扣除", "success")
             return redirect(url_for("order_detail", oID=oID))
 
         except sqlite3.Error as e:
@@ -740,7 +757,6 @@ def order_new():
         products=products_rows,
         products_json=products_json,
     )
-
 
 @app.route("/orders/<oID>")
 def order_detail(oID):
@@ -789,7 +805,8 @@ def reports():
     db = get_db()
 
     today = date.today().isoformat()
-    start_date = request.args.get("start_date") or today[:8] + "01"
+    # 預設查詢範圍改為今年，以便看清跨月節點的趨勢
+    start_date = request.args.get("start_date") or today[:4] + "-01-01"
     end_date = request.args.get("end_date") or today
 
     summary = db.execute('''
@@ -840,6 +857,27 @@ def reports():
         ORDER BY o.order_time
     ''', (start_date, end_date)).fetchall()
 
+    # 💡 核心新增：一個月分兩個節點統計（1-15日為上半月，16日後為下半月）
+    node_sales = db.execute('''
+        SELECT
+            strftime('%Y-%m', o.order_time) AS month_label,
+            CASE WHEN CAST(strftime('%d', o.order_time) AS INTEGER) <= 15 THEN '上半月' ELSE '下半月' END AS node_label,
+            SUM(od.quantity * CAST(COALESCE(NULLIF(p.real_price, ''), '0') AS INTEGER)) AS revenue,
+            SUM(od.quantity * (CAST(COALESCE(NULLIF(p.real_price, ''), '0') AS INTEGER) - CAST(COALESCE(NULLIF(p.cost, ''), '0') AS INTEGER))) AS gross_profit
+        FROM "ORDER" o
+        JOIN ORDER_DETAIL od ON od.oID = o.oID
+        JOIN PRODUCT p ON p.iID = od.iID
+        WHERE o.order_time BETWEEN ? AND ?
+          AND o.state != '已取消'
+        GROUP BY month_label, node_label
+        ORDER BY month_label ASC, node_label DESC
+    ''', (start_date, end_date)).fetchall()
+
+    # 格式化為圖表專用陣列
+    chart_labels = [f"{row['month_label']} {row['node_label']}" for row in node_sales]
+    chart_revenue = [row['revenue'] for row in node_sales]
+    chart_gross_profit = [row['gross_profit'] for row in node_sales]
+
     order_rows = db.execute('''
         SELECT
             o.oID,
@@ -863,8 +901,26 @@ def reports():
         product_sales=product_sales,
         daily_sales=daily_sales,
         order_rows=order_rows,
+        chart_labels=chart_labels,          # 傳遞至前端
+        chart_revenue=chart_revenue,        # 傳遞至前端
+        chart_gross_profit=chart_gross_profit  # 傳遞至前端
     )
+def next_material_id(db):
+    """計算並回傳下一個物料編號 (mID)"""
+    row = db.execute('''
+        SELECT MAX(CAST(mID AS INTEGER)) AS max_id
+        FROM MATERIAL_INVENTORY
+        WHERE mID GLOB '[0-9]*'
+    ''').fetchone()
+    return str((row["max_id"] or 0) + 1)
 
-
+# -----------------------------
+# 應用程式啟動點
+# -----------------------------
 if __name__ == "__main__":
+    # 在伺服器啟動前建立上下文，確保資料表存在（但不會影響已有的手動修改資料）
+    with app.app_context():
+        init_db()
+        
+    # debug=True 確保修改 app.py 程式碼時，伺服器會自動重啟並重連資料庫
     app.run(debug=True)
